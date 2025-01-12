@@ -111,7 +111,14 @@ class MainDashboard(QWidget):
 
     def executeTrade(self):
         """매매 실행 버튼 동작"""
-        print("매매 실행 요청 전송...")
+        try:
+            response = requests.post(f"{self.api_url}/execute_trade", headers={"Authorization": f"Bearer {self.api_key}"})
+            if response.status_code == 200:
+                print("매매 실행 성공")
+            else:
+                print(f"매매 실행 실패: {response.text}")
+        except Exception as e:
+            print(f"매매 실행 요청 오류: {e}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

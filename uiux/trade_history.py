@@ -1,78 +1,84 @@
-import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QTableWidget, QTableWidgetItem, QPushButton, QChartView
-from PyQt5.QtChart import QChart, QLineSeries, QValueAxis
+# trade_history.py
 
-class TradeHistoryPanel(QMainWindow):
-    def __init__(self):
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QTableWidget, QTableWidgetItem
+from PyQt5.QtCore import Qt
+import requests
+
+class TradeHistory(QWidget):
+    def __init__(self, api_url, api_key):
         super().__init__()
-        self.setWindowTitle("거래 이력 및 백테스팅 패널")
-        self.setGeometry(100, 100, 800, 600)
+        self.api_url = api_url
+        self.api_key = api_key
+
         self.initUI()
 
     def initUI(self):
-        main_widget = QWidget()
-        main_layout = QVBoxLayout()
+        self.setWindowTitle("Trade History & Backtesting Panel")
+        self.setGeometry(100, 100, 800, 600)
 
-        # 거래 내역 테이블
-        trade_history_label = QLabel("[거래 내역]")
-        trade_table = QTableWidget(2, 4)
-        trade_table.setHorizontalHeaderLabels(["자산", "거래 유형", "금액 (KRW)", "수익률"])
-        trade_table.setItem(0, 0, QTableWidgetItem("BTC"))
-        trade_table.setItem(0, 1, QTableWidgetItem("매수"))
-        trade_table.setItem(0, 2, QTableWidgetItem("72,000,000"))
-        trade_table.setItem(0, 3, QTableWidgetItem("+3% 수익"))  # 강조 적용
-        trade_table.setItem(1, 0, QTableWidgetItem("ETH"))
-        trade_table.setItem(1, 1, QTableWidgetItem("매도"))
-        trade_table.setItem(1, 2, QTableWidgetItem("5,100,000"))
-        trade_table.setItem(1, 3, QTableWidgetItem("-1% 손실"))  # 강조 적용
+        # Main Layout
+        layout = QVBoxLayout(self)
 
-        # 백테스팅 결과
-        backtest_label = QLabel("[백테스팅 결과]")
-        backtest_info = QLabel("기간: 2023.01.01 ~ 2024.01.01\n총 수익률: +120%\n승률: 75%\n최대 손실폭: -12%")
+        # Section: Trade History
+        self.trade_history_label = QLabel("거래 내역", self)
+        layout.addWidget(self.trade_history_label)
 
-        # 전략 비교 섹션
-        strategy_label = QLabel("[전략 비교]")
-        strategy_comparison = QLabel(
-            "전략 A: MACD + RSI (70% 수익)\n"
-            "전략 B: MACD + LSTM (120% 수익)\n"
-            "전략 C: Bollinger + EMA (50% 수익)"
-        )
+        self.trade_history_table = QTableWidget(self)
+        self.trade_history_table.setColumnCount(4)
+        self.trade_history_table.setHorizontalHeaderLabels(["일시", "종목", "거래 유형", "수익률"])
+        layout.addWidget(self.trade_history_table)
 
-        # 버튼 섹션 추가
-        ab_test_button = QPushButton("A/B 전략 테스트 실행")
-        strategy_optimize_button = QPushButton("전략 최적화")  # 추가된 버튼
+        # Section: Backtesting Results
+        self.backtesting_label = QLabel("백테스팅 결과", self)
+        layout.addWidget(self.backtesting_label)
 
-        # 수익률 그래프
-        chart = QChart()
-        series = QLineSeries()
-        series.append(0, 50)
-        series.append(1, 70)
-        series.append(2, 120)
-        chart.addSeries(series)
-        axisX = QValueAxis()
-        axisY = QValueAxis()
-        chart.setAxisX(axisX, series)
-        chart.setAxisY(axisY, series)
-        chart_view = QChartView(chart)
-        chart.setTitle("수익률 그래프")
+        self.backtesting_table = QTableWidget(self)
+        self.backtesting_table.setColumnCount(4)
+        self.backtesting_table.setHorizontalHeaderLabels(["기간", "총 수익률", "승률", "최대 손실폭"])
+        layout.addWidget(self.backtesting_table)
 
-        # 레이아웃 추가
-        main_layout.addWidget(trade_history_label)
-        main_layout.addWidget(trade_table)
-        main_layout.addWidget(backtest_label)
-        main_layout.addWidget(backtest_info)
-        main_layout.addWidget(strategy_label)
-        main_layout.addWidget(strategy_comparison)
-        main_layout.addWidget(ab_test_button)
-        main_layout.addWidget(strategy_optimize_button)  # 추가된 버튼
-        main_layout.addWidget(chart_view)
+        self.refresh_data()
 
-        # 메인 위젯에 레이아웃 적용
-        main_widget.setLayout(main_layout)
-        self.setCentralWidget(main_widget)
+    def refresh_data(self):
+        """Fetches and updates the trade history and backtesting results."""
+        trade_data = self.fetch_trade_history()
+        self.update_trade_history_table(trade_data)
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = TradeHistoryPanel()
-    window.show()
-    sys.exit(app.exec_())
+        backtesting_data = self.fetch_backtesting_results()
+        self.update_backtesting_table(backtesting_data)
+
+    def fetch_trade_history(self):
+        """Fetch trade history data from the API."""
+        try:
+            response = requests.get(f"{self.api_url}/trade-history", headers={"Authorization": f"Bearer {self.api_key}"})
+            return response.json()
+        except Exception as e:
+            print(f"Error fetching trade history: {e}")
+            return []
+
+    def fetch_backtesting_results(self):
+        """Fetch backtesting results data from the API."""
+        try:
+            response = requests.get(f"{self.api_url}/backtesting-results", headers={"Authorization": f"Bearer {self.api_key}"})
+            return response.json()
+        except Exception as e:
+            print(f"Error fetching backtesting results: {e}")
+            return []
+
+    def update_trade_history_table(self, data):
+        """Update the trade history table with fetched data."""
+        self.trade_history_table.setRowCount(len(data))
+        for row, trade in enumerate(data):
+            self.trade_history_table.setItem(row, 0, QTableWidgetItem(trade.get("date", "N/A")))
+            self.trade_history_table.setItem(row, 1, QTableWidgetItem(trade.get("symbol", "N/A")))
+            self.trade_history_table.setItem(row, 2, QTableWidgetItem(trade.get("type", "N/A")))
+            self.trade_history_table.setItem(row, 3, QTableWidgetItem(trade.get("return", "N/A")))
+
+    def update_backtesting_table(self, data):
+        """Update the backtesting results table with fetched data."""
+        self.backtesting_table.setRowCount(len(data))
+        for row, result in enumerate(data):
+            self.backtesting_table.setItem(row, 0, QTableWidgetItem(result.get("period", "N/A")))
+            self.backtesting_table.setItem(row, 1, QTableWidgetItem(result.get("total_return", "N/A")))
+            self.backtesting_table.setItem(row, 2, QTableWidgetItem(result.get("win_rate", "N/A")))
+            self.backtesting_table.setItem(row, 3, QTableWidgetItem(result.get("max_drawdown", "N/A")))

@@ -1,51 +1,59 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, LSTM, GRU, Dense, Dropout, BatchNormalization, Conv1D, MaxPooling1D, Flatten, Bidirectional
-from tensorflow.keras.optimizers import AdamW
+from tensorflow.keras.layers import (
+    Input, LSTM, GRU, Dense, Dropout, BatchNormalization,
+    Conv1D, MaxPooling1D, Flatten, Bidirectional, MultiHeadAttention, Add
+)
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.losses import Huber
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from sklearn.preprocessing import MinMaxScaler
 
-class AdvancedLSTMModel:
+class EnhancedLSTMModel:
     def __init__(self, input_shape, units=128, dropout_rate=0.3, learning_rate=0.001):
         """
-        고급 LSTM 모델 (Bidirectional LSTM + GRU + CNN + Attention)
+        고급 LSTM 모델 (CNN + Residual Connection + Multi-Head Attention + Bidirectional LSTM)
         :param input_shape: 입력 데이터 형태 (timesteps, features)
-        :param units: LSTM 셀의 수
+        :param units: LSTM 및 GRU 셀의 수
         :param dropout_rate: 드롭아웃 비율
         :param learning_rate: 학습률
         """
         inputs = Input(shape=input_shape)
-        
-        # 1D CNN for Feature Extraction and Dimension Reduction
-        x = Conv1D(filters=64, kernel_size=3, activation='relu', padding='same')(inputs)
-        x = MaxPooling1D(pool_size=2)(x)
+
+        # 1D CNN with Residual Connection
+        x = Conv1D(filters=128, kernel_size=3, activation='relu', padding='same')(inputs)
         x = BatchNormalization()(x)
-        
-        # Bidirectional LSTM for sequence learning
-        x = Bidirectional(LSTM(units, return_sequences=True, kernel_regularizer=tf.keras.regularizers.l2(0.001)))(x)
+        x = Conv1D(filters=128, kernel_size=3, activation='relu', padding='same')(x)
+        x = Add()([x, inputs])  # Residual Connection
+        x = MaxPooling1D(pool_size=2)(x)
         x = Dropout(dropout_rate)(x)
 
-        # GRU Layer for further sequence learning
+        # Bidirectional LSTM
+        x = Bidirectional(LSTM(units, return_sequences=True))(x)
+        x = Dropout(dropout_rate)(x)
+
+        # GRU Layer
         x = GRU(units, return_sequences=True)(x)
         x = Dropout(dropout_rate)(x)
 
-        # Attention Mechanism
-        attention_output = tf.keras.layers.Attention()([x, x])
-        x = Flatten()(attention_output)
+        # Multi-Head Attention Mechanism
+        attention_output = MultiHeadAttention(num_heads=4, key_dim=units)(x, x)
+        x = Add()([attention_output, x])  # Residual Connection with Attention
+        x = Flatten()(x)
 
         # Output Layer
         outputs = Dense(1, activation='linear')(x)
 
         self.model = Model(inputs, outputs)
-        self.model.compile(optimizer=AdamW(learning_rate=learning_rate), loss='mean_squared_error')
+        self.model.compile(optimizer=Adam(learning_rate=learning_rate), loss=Huber())
 
     def train(self, X, y, epochs=100, batch_size=64, validation_split=0.2):
         """
         모델 학습
         """
         early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
-        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=1e-5)
+        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=1e-6)
 
         self.model.fit(
             X, y, epochs=epochs, batch_size=batch_size, 
@@ -96,7 +104,7 @@ if __name__ == "__main__":
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
 
     # 모델 생성 및 학습
-    model = AdvancedLSTMModel(input_shape=(sequence_length, 1))
+    model = EnhancedLSTMModel(input_shape=(sequence_length, 1))
     model.train(X_train, y_train, epochs=50, batch_size=64)
 
     # 예측 및 성능 확인
@@ -105,4 +113,4 @@ if __name__ == "__main__":
     print(f"예측 결과 (복원): {predictions_rescaled[:5]}")
 
     # 모델 저장
-    model.save_model("advanced_lstm_model.h5")
+    model.save_model("enhanced_lstm_model.h5")

@@ -1,63 +1,60 @@
-import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QCheckBox, QPushButton, QMessageBox
+# alerts.py
 
-class RealTimeAlertPanel(QMainWindow):
-    def __init__(self):
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QListWidget
+import requests
+
+class AlertsPanel(QWidget):
+    def __init__(self, api_url, api_key):
         super().__init__()
-        self.setWindowTitle("실시간 경고 시스템")
-        self.setGeometry(100, 100, 600, 400)
+        self.api_url = api_url
+        self.api_key = api_key
+
         self.initUI()
 
     def initUI(self):
-        # 메인 레이아웃 설정
-        main_widget = QWidget()
-        layout = QVBoxLayout()
+        self.setWindowTitle("Alerts & Notifications")
+        self.setGeometry(100, 100, 800, 600)
 
-        # 경고 패널 레이블
-        self.alert_label = QLabel("[실시간 경고 시스템]")
-        layout.addWidget(self.alert_label)
+        # Main Layout
+        layout = QVBoxLayout(self)
 
-        # 경고 상태 레이블
-        self.btc_alert = QLabel("🔴 BTC 가격 급락 경고: RSI 25 (과매도)")
-        self.eth_alert = QLabel("🔴 ETH 수익률 하락: -5% (손절매 발동)")
-        self.ai_confidence = QLabel("✅ AI 신뢰도 상승: 92% (매수 신호 강함)")
+        # Section: Alerts and Notifications
+        self.alerts_label = QLabel("실시간 경고 시스템", self)
+        layout.addWidget(self.alerts_label)
 
-        # 알림 옵션 체크박스
-        self.email_alert = QCheckBox("📧 이메일 경고")
-        self.push_alert = QCheckBox("📲 푸시 알림")
-        self.sms_alert = QCheckBox("📩 SMS 경고")
+        self.alerts_list = QListWidget(self)
+        layout.addWidget(self.alerts_list)
 
-        # 버튼 설정
-        self.alert_button = QPushButton("경고 알림 테스트")
-        self.alert_button.clicked.connect(self.trigger_alert)
+        # Section: Notification Settings
+        self.settings_label = QLabel("알림 설정", self)
+        layout.addWidget(self.settings_label)
 
-        # 레이아웃 추가
-        layout.addWidget(self.btc_alert)
-        layout.addWidget(self.eth_alert)
-        layout.addWidget(self.ai_confidence)
-        layout.addWidget(self.email_alert)
-        layout.addWidget(self.push_alert)
-        layout.addWidget(self.sms_alert)
-        layout.addWidget(self.alert_button)
+        self.notification_settings = QLabel(
+            "📧 이메일 경고 | 📱 푸시 알림 | 📩 SMS 경고", self
+        )
+        layout.addWidget(self.notification_settings)
 
-        # 메인 위젯에 레이아웃 적용
-        main_widget.setLayout(layout)
-        self.setCentralWidget(main_widget)
+        self.refresh_alerts()
 
-    # 경고 알림 테스트 함수
-    def trigger_alert(self):
-        message = "📢 경고 알림 테스트 메시지!"
-        if self.email_alert.isChecked():
-            message += "\n- 이메일 알림 발송됨"
-        if self.push_alert.isChecked():
-            message += "\n- 푸시 알림 발송됨"
-        if self.sms_alert.isChecked():
-            message += "\n- SMS 알림 발송됨"
+    def refresh_alerts(self):
+        """Fetches and updates the alerts."""
+        alerts = self.fetch_alerts()
+        self.update_alerts_list(alerts)
 
-        QMessageBox.information(self, "경고 알림", message)
+    def fetch_alerts(self):
+        """Fetch alerts data from the API."""
+        try:
+            response = requests.get(
+                f"{self.api_url}/alerts", headers={"Authorization": f"Bearer {self.api_key}"}
+            )
+            return response.json()
+        except Exception as e:
+            print(f"Error fetching alerts: {e}")
+            return []
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = RealTimeAlertPanel()
-    window.show()
-    sys.exit(app.exec_())
+    def update_alerts_list(self, alerts):
+        """Update the alerts list with fetched data."""
+        self.alerts_list.clear()
+        for alert in alerts:
+            icon = "🔴" if alert["type"] == "warning" else "🟢"
+            self.alerts_list.addItem(f"{icon} {alert['message']}")

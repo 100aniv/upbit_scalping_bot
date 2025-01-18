@@ -1,53 +1,69 @@
-# risk_management/trailing_stop.py
+# 디렉터리: risk_management
+# 파일: trailing_stop.py
+
+import pandas as pd
+import numpy as np
 
 class TrailingStop:
-    def __init__(self, trailing_stop_percentage=5):
-        """
-        트레일링 스탑 클래스
-        :param trailing_stop_percentage: 트레일링 스탑 비율 (기본값 5%)
-        """
-        self.trailing_stop_percentage = trailing_stop_percentage
-        self.highest_price = None
+    """
+    고급 트레일링 스탑 모듈
+    - 고정 퍼센트 기반 트레일링 스탑
+    - ATR 기반 동적 트레일링 스탑
+    - AI 기반 트레일링 스탑 적용
+    """
 
-    def update_highest_price(self, current_price):
-        """
-        현재 가격이 기존 최고가보다 높을 경우 최고가 갱신
-        :param current_price: 현재 가격
-        """
-        if self.highest_price is None or current_price > self.highest_price:
-            self.highest_price = current_price
+    def __init__(self):
+        pass
 
-    def check_trailing_stop(self, current_price):
+    def fixed_trailing_stop(self, data, trail_percent=0.03):
         """
-        트레일링 스탑 발생 여부 확인
-        :param current_price: 현재 가격
-        :return: 트레일링 스탑 발생 여부 (True/False)
+        고정 퍼센트 트레일링 스탑 적용
+        :param data: 데이터프레임
+        :param trail_percent: 트레일링 스탑 퍼센트
+        :return: 트레일링 스탑 적용된 데이터프레임
         """
-        if self.highest_price is None:
-            return False
-        stop_threshold = self.highest_price * (1 - self.trailing_stop_percentage / 100)
-        return current_price <= stop_threshold
+        max_price = data['close'].cummax()
+        data['trailing_stop_triggered'] = data['close'] < max_price * (1 - trail_percent)
+        return data
 
-    def calculate_new_balance(self, current_price, position_size):
+    def atr_based_trailing_stop(self, data, atr_period=14, multiplier=1.5):
         """
-        트레일링 스탑 발생 시 잔액 업데이트
-        :param current_price: 현재 가격
-        :param position_size: 보유 포지션 크기
-        :return: 트레일링 스탑 발생 시 업데이트된 잔액
+        ATR 기반 동적 트레일링 스탑
+        :param data: 데이터프레임
+        :param atr_period: ATR 계산 주기
+        :param multiplier: ATR 곱하기 배수
+        :return: 트레일링 스탑 적용된 데이터프레임
         """
-        if self.check_trailing_stop(current_price):
-            return current_price * position_size
-        return self.highest_price * position_size
+        data['atr'] = data['close'].rolling(window=atr_period).std()
+        data['trailing_stop_level'] = data['close'] - (data['atr'] * multiplier)
+        data['trailing_stop_triggered'] = data['close'] < data['trailing_stop_level']
+        return data
 
+    def ai_based_trailing_stop(self, data, ai_predictions, confidence_levels):
+        """
+        AI 기반 트레일링 스탑 적용
+        :param data: 데이터프레임
+        :param ai_predictions: AI 예측 데이터 (수익 기대값)
+        :param confidence_levels: AI 예측 신뢰도
+        :return: 트레일링 스탑 적용된 데이터프레임
+        """
+        risk_adjusted_trailing = ai_predictions * confidence_levels
+        max_price = data['close'].cummax()
+        data['trailing_stop_triggered'] = data['close'] < (max_price * (1 - risk_adjusted_trailing.mean()))
+        return data
+
+# 예제 실행
 if __name__ == "__main__":
-    # 예제 사용
-    trailing_stop = TrailingStop(trailing_stop_percentage=5)
-    prices = [100000, 102000, 104000, 103000, 101000, 98000]
+    data = pd.DataFrame({
+        'close': np.random.rand(100) * 100
+    })
 
-    for price in prices:
-        trailing_stop.update_highest_price(price)
-        if trailing_stop.check_trailing_stop(price):
-            new_balance = trailing_stop.calculate_new_balance(price, 1)
-            print(f"트레일링 스탑 발생: 현재 가격 {price}원, 잔액 {new_balance}원")
-        else:
-            print(f"현재 가격 {price}원: 포지션 유지")
+    trailing_stop = TrailingStop()
+    data = trailing_stop.fixed_trailing_stop(data)
+    print("고정 퍼센트 트레일링 스탑 적용 완료.")
+
+    data = trailing_stop.atr_based_trailing_stop(data)
+    print("ATR 기반 트레일링 스탑 적용 완료.")
+
+    data = trailing_stop.ai_based_trailing_stop(data, ai_predictions=np.random.rand(100) - 0.5, confidence_levels=np.random.rand(100))
+    print("AI 기반 트레일링 스탑 적용 완료.")

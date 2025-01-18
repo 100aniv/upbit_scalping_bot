@@ -1,65 +1,76 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QTableWidget, QTableWidgetItem, QProgressBar, QChartView
-from PyQt5.QtChart import QChart, QPieSeries
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QPushButton
+import requests
 
-class PortfolioPanel(QMainWindow):
-    def __init__(self):
+class PortfolioManagementPanel(QWidget):
+    def __init__(self, api_key, api_url):
         super().__init__()
-        self.setWindowTitle("포트폴리오 관리 패널")
-        self.setGeometry(100, 100, 600, 600)
+        self.api_key = api_key
+        self.api_url = api_url
+
+        # UI 구성
         self.initUI()
 
     def initUI(self):
-        # 메인 레이아웃 설정
-        main_widget = QWidget()
-        main_layout = QVBoxLayout()
+        self.setWindowTitle("Portfolio Management Panel")
 
-        # 포트폴리오 정보 레이블
-        title_label = QLabel("[포트폴리오 현황]")
-        title_label.setAlignment(Qt.AlignCenter)
+        # 라벨 구성
+        self.label_portfolio = QLabel("포트폴리오 현황 불러오는 중...")
+        self.label_total_value = QLabel("총 평가 금액: 불러오는 중...")
+        self.label_total_percentage = QLabel("총 자산 비중: 불러오는 중...")
 
-        # 자산 테이블
-        self.table = QTableWidget(3, 3)
-        self.table.setHorizontalHeaderLabels(["자산", "수량", "평가액 (KRW)"])
-        self.table.setItem(0, 0, QTableWidgetItem("BTC"))
-        self.table.setItem(0, 1, QTableWidgetItem("0.3"))
-        self.table.setItem(0, 2, QTableWidgetItem("72,000,000"))
-        self.table.setItem(1, 0, QTableWidgetItem("ETH"))
-        self.table.setItem(1, 1, QTableWidgetItem("1.5"))
-        self.table.setItem(1, 2, QTableWidgetItem("6,000,000"))
-        self.table.setItem(2, 0, QTableWidgetItem("XRP"))
-        self.table.setItem(2, 1, QTableWidgetItem("500"))
-        self.table.setItem(2, 2, QTableWidgetItem("2,000,000"))
+        # 버튼 추가
+        self.btn_report_download = QPushButton("데이터 리포트 다운로드")
+        self.btn_report_download.clicked.connect(self.downloadReport)
 
-        # 리스크 점수 바
-        risk_label = QLabel("AI 리스크 점수: 45% (중간)")
-        self.risk_bar = QProgressBar()
-        self.risk_bar.setValue(45)
+        self.btn_risk_optimize = QPushButton("리스크 최적화 재계산")
+        self.btn_risk_optimize.clicked.connect(self.optimizeRisk)
 
-        # 포트폴리오 파이차트
-        self.chart = QChart()
-        self.pie_series = QPieSeries()
-        self.pie_series.append("BTC", 60)
-        self.pie_series.append("ETH", 30)
-        self.pie_series.append("XRP", 10)
-        self.chart.addSeries(self.pie_series)
-        self.chart.setTitle("포트폴리오 비중")
-        self.chart_view = QChartView(self.chart)
+        # 레이아웃 구성
+        layout = QVBoxLayout()
+        layout.addWidget(self.label_portfolio)
+        layout.addWidget(self.label_total_value)
+        layout.addWidget(self.label_total_percentage)
+        layout.addWidget(self.btn_report_download)
+        layout.addWidget(self.btn_risk_optimize)
 
-        # 레이아웃에 위젯 추가
-        main_layout.addWidget(title_label)
-        main_layout.addWidget(self.table)
-        main_layout.addWidget(risk_label)
-        main_layout.addWidget(self.risk_bar)
-        main_layout.addWidget(self.chart_view)
+        self.setLayout(layout)
 
-        # 메인 위젯에 레이아웃 설정
-        main_widget.setLayout(main_layout)
-        self.setCentralWidget(main_widget)
+        # 초기 데이터 로딩
+        self.fetchData()
+
+    def fetchData(self):
+        try:
+            response = requests.get(f"{self.api_url}/portfolio", headers={"Authorization": f"Bearer {self.api_key}"})
+            data = response.json()
+            self.label_portfolio.setText(f"포트폴리오: {data['portfolio']}")
+            self.label_total_value.setText(f"총 평가 금액: {data['total_value']} KRW")
+            self.label_total_percentage.setText(f"총 자산 비중: {data['total_percentage']}%")
+        except Exception as e:
+            self.label_portfolio.setText("데이터 로딩 실패")
+
+    def optimizeRisk(self):
+        try:
+            response = requests.post(f"{self.api_url}/optimize_portfolio_risk", headers={"Authorization": f"Bearer {self.api_key}"})
+            if response.status_code == 200:
+                self.fetchData()
+        except Exception as e:
+            print(f"리스크 최적화 오류: {e}")
+
+    def downloadReport(self):
+        try:
+            response = requests.get(f"{self.api_url}/download_report", headers={"Authorization": f"Bearer {self.api_key}"})
+            if response.status_code == 200:
+                with open("portfolio_report.pdf", "wb") as file:
+                    file.write(response.content)
+                print("데이터 리포트 다운로드 완료")
+            else:
+                print("리포트 다운로드 실패")
+        except Exception as e:
+            print(f"리포트 다운로드 오류: {e}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = PortfolioPanel()
-    window.show()
+    panel = PortfolioManagementPanel(api_key="your_api_key", api_url="https://your-api-url.com")
+    panel.show()
     sys.exit(app.exec_())

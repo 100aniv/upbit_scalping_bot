@@ -1,53 +1,67 @@
-# risk_management/position_sizing.py
+# 디렉터리: risk_management
+# 파일: stop_loss.py
 
-class PositionSizing:
-    def __init__(self, balance, risk_percentage=1):
-        """
-        포지션 크기 관리 클래스
-        :param balance: 총 계좌 잔액
-        :param risk_percentage: 거래당 위험 비율 (기본값 1%)
-        """
-        if balance <= 0:
-            raise ValueError("잔액은 0보다 커야 합니다.")
-        if not (0 < risk_percentage <= 100):
-            raise ValueError("위험 비율은 0과 100 사이여야 합니다.")
-        
-        self.balance = balance
-        self.risk_percentage = risk_percentage
+import pandas as pd
+import numpy as np
 
-    def calculate_position_size(self, stop_loss_distance):
-        """
-        포지션 크기 계산
-        :param stop_loss_distance: 손절매 기준 거리
-        :return: 포지션 크기
-        """
-        if stop_loss_distance <= 0:
-            raise ValueError("손절매 기준 거리는 0보다 커야 합니다.")
-        
-        risk_amount = self.balance * (self.risk_percentage / 100)
-        position_size = risk_amount / stop_loss_distance
-        return position_size
+class StopLoss:
+    """
+    고급 손절매 모듈
+    - 고정 손절매 비율
+    - ATR 기반 동적 손절매
+    - AI 기반 손절매 적용
+    """
 
-    def update_balance(self, profit_loss_amount):
-        """
-        잔액 업데이트
-        :param profit_loss_amount: 수익 또는 손실 금액
-        """
-        self.balance += profit_loss_amount
-        if self.balance <= 0:
-            print("경고: 계좌 잔액이 0 이하입니다!")
-        return self.balance
+    def __init__(self):
+        pass
 
+    def fixed_stop_loss(self, data, stop_loss_percent=0.05):
+        """
+        고정 손절매 비율 적용
+        :param data: 데이터프레임
+        :param stop_loss_percent: 손절매 비율
+        :return: 손절매 적용된 데이터프레임
+        """
+        data['stop_loss_triggered'] = data['close'].pct_change() <= -stop_loss_percent
+        return data
+
+    def atr_based_stop_loss(self, data, atr_period=14, multiplier=1.5):
+        """
+        ATR 기반 동적 손절매
+        :param data: 데이터프레임
+        :param atr_period: ATR 계산 주기
+        :param multiplier: ATR에 곱할 배수
+        :return: 손절매 적용된 데이터프레임
+        """
+        data['atr'] = data['close'].rolling(window=atr_period).std()
+        stop_loss_level = data['close'] - (data['atr'] * multiplier)
+        data['stop_loss_triggered'] = data['close'] <= stop_loss_level
+        return data
+
+    def ai_based_stop_loss(self, data, ai_predictions, risk_tolerance=0.02):
+        """
+        AI 예측 기반 손절매
+        :param data: 데이터프레임
+        :param ai_predictions: AI 예측 데이터 (수익률 예상)
+        :param risk_tolerance: 리스크 허용 수준
+        :return: 손절매 적용된 데이터프레임
+        """
+        risk_adjusted_predictions = ai_predictions * (1 - risk_tolerance)
+        data['stop_loss_triggered'] = risk_adjusted_predictions < 0
+        return data
+
+# 예제 실행
 if __name__ == "__main__":
-    # 예제 사용
-    position_sizing = PositionSizing(balance=1000000, risk_percentage=1)
-    stop_loss_distance = 5000
-    try:
-        position_size = position_sizing.calculate_position_size(stop_loss_distance)
-        print(f"계산된 포지션 크기: {position_size:.2f}")
-    except ValueError as e:
-        print(f"오류 발생: {e}")
+    data = pd.DataFrame({
+        'close': np.random.rand(100) * 100
+    })
 
-    # 잔액 업데이트 예제
-    updated_balance = position_sizing.update_balance(-100000)
-    print(f"잔액 업데이트 후: {updated_balance:.2f}")
+    stop_loss = StopLoss()
+    data = stop_loss.fixed_stop_loss(data)
+    print("고정 손절매 적용 완료.")
+
+    data = stop_loss.atr_based_stop_loss(data)
+    print("ATR 기반 손절매 적용 완료.")
+
+    data = stop_loss.ai_based_stop_loss(data, ai_predictions=np.random.rand(100) - 0.5)
+    print("AI 기반 손절매 적용 완료.")
